@@ -3,19 +3,64 @@ package main
 import (
     "fmt"
     "os"
+    "net/http"
+    "io"
+    "encoding/json"
     tea "github.com/charmbracelet/bubbletea"
-//	"github.com/fogleman/ease"
-//	"github.com/lucasb-eyer/go-colorful"
 	"github.com/muesli/reflow/indent"
 	"github.com/muesli/termenv"
 )
 
 func main() {
-    p := tea.NewProgram(initialModel())
-    if _, err := p.Run(); err != nil {
+//    p := tea.NewProgram(initialModel())
+//    if _, err := p.Run(); err != nil {
+//        fmt.Printf("Alas, there's been an error: %v", err)
+//        os.Exit(1)
+//    }
+    getSong("tuK6n2Lkza0")
+}
+
+func getSong(link string) {
+    resp, err := http.Get("https://pipedapi.kavin.rocks/streams/" + link)
+    if err != nil {
         fmt.Printf("Alas, there's been an error: %v", err)
         os.Exit(1)
     }
+    defer resp.Body.Close()
+
+    body, err := io.ReadAll(resp.Body)
+    if err != nil {
+        fmt.Printf("Alas, there's been an error reading the body: %v", err)
+        os.Exit(1)
+    }
+
+    type AudioStream struct {
+		URL       string `json:"url"`
+		Format    string `json:"format"`
+		Quality   string `json:"quality"`
+		MimeType  string `json:"mimeType"`
+		Codec     string `json:"codec"`
+		Bitrate   int    `json:"bitrate"`
+		ContentLength int `json:"contentLength"`
+	}
+
+    type Result struct {
+        Title string `json:"title"`
+        Artist string `json:"uploader"`
+        AudioLink []AudioStream `json:"audioStreams"`
+    }
+
+    var result Result
+    json.Unmarshal(body, &result)
+
+    if len(result.AudioLink) <= 0 {
+        fmt.Println("No audio stream found")
+        os.Exit(1)
+    }
+
+    fmt.Println(result.Title)
+    fmt.Println(result.Artist)
+    fmt.Println(result.AudioLink[0].URL)
 }
 
 var (
@@ -52,8 +97,6 @@ func (m menu) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	// Hand off the message and model to the appropriate update function for the
-	// appropriate view based on the current state.
 	if !m.Chosen {
 		return updateChoices(msg, m)
 	}
@@ -112,16 +155,19 @@ func choicesView(m menu) string {
 		checkbox("Help", c == 3),
         checkbox("Exit", c == 4),
 	)
-
 	return fmt.Sprintf(choices)
 }
 
 func chosenView(m menu) string {
     var msg string
-
     switch m.cursor {
     case 0:
         msg = fmt.Sprintf("Quick")
+        p := tea.NewProgram(initialModel())
+        if _, err := p.Run(); err != nil {
+            fmt.Printf("Alas, there's been an error: %v", err)
+            os.Exit(1)
+    }   
     case 1:
         msg = fmt.Sprintf("Playlists")
     case 2:
@@ -130,7 +176,6 @@ func chosenView(m menu) string {
         msg = fmt.Sprintf("Help")
     case 4:
         msg = fmt.Sprintf("Exit")
-        //exit tea
         os.Exit(0)
     }
     return msg
@@ -138,7 +183,7 @@ func chosenView(m menu) string {
 
 func checkbox(label string, checked bool) string {
 	if checked {
-		return colorFg("[x] "+label, "212")
+		return colorFg("[x] "+label, "39")
 	}
 	return fmt.Sprintf("[ ] %s", label)
 }
