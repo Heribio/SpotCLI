@@ -6,22 +6,23 @@ import (
     "net/http"
     "io"
     "encoding/json"
+    "os/exec"
     tea "github.com/charmbracelet/bubbletea"
 	"github.com/muesli/reflow/indent"
 	"github.com/muesli/termenv"
+    "time"
 )
 
 func main() {
-//    p := tea.NewProgram(initialModel())
-//    if _, err := p.Run(); err != nil {
-//        fmt.Printf("Alas, there's been an error: %v", err)
-//        os.Exit(1)
-//    }
-    getSong("tuK6n2Lkza0")
+    p := tea.NewProgram(initialModel())
+    if _, err := p.Run(); err != nil {
+        fmt.Printf("Alas, there's been an error: %v", err)
+        os.Exit(1)
+    }
 }
 
 func getSong(link string) {
-    resp, err := http.Get("https://pipedapi.kavin.rocks/streams/" + link)
+    resp, err := http.Get("https://pipedapi.syncpundit.io/streams/" + link)
     if err != nil {
         fmt.Printf("Alas, there's been an error: %v", err)
         os.Exit(1)
@@ -47,9 +48,10 @@ func getSong(link string) {
     type Result struct {
         Title string `json:"title"`
         Artist string `json:"uploader"`
+        Duration int `json:"duration"`
         AudioLink []AudioStream `json:"audioStreams"`
     }
-
+    
     var result Result
     json.Unmarshal(body, &result)
 
@@ -61,7 +63,38 @@ func getSong(link string) {
     fmt.Println(result.Title)
     fmt.Println(result.Artist)
     fmt.Println(result.AudioLink[0].URL)
+    fmt.Println("Duration: ", result.Duration)
+    downloadSong(result.AudioLink[1].URL, "audio.mp4", result.Duration)
 }
+
+func downloadSong(url, filename string, duration int) {
+    fmt.Println("Downloading audio...")
+    cmd := exec.Command("curl", "-o", filename, url)
+    err := cmd.Run()
+    if err != nil {
+        fmt.Printf("Error downloading audio stream: %v\n", err)
+        return
+    }
+
+    fmt.Printf("Audio saved as %s\n", filename)
+    playCmd := exec.Command("afplay", filename, "-t", fmt.Sprintf("%d", duration))
+    err = playCmd.Run()
+    if err != nil {
+        fmt.Printf("Error playing audio file: %v\n", err)
+        return
+    }
+    time.Sleep(time.Duration(duration) * time.Second)
+    stopPlay := exec.Command("killall", "afplay")
+    err = stopPlay.Run()
+    if err != nil {
+        fmt.Printf("Error stopping audio playback: %v\n", err)
+        return
+    }
+    os.Remove(filename)
+
+    fmt.Println("Audio playback complete")
+}
+
 
 var (
 	subtle        = makeFgStyle("241")
@@ -163,11 +196,7 @@ func chosenView(m menu) string {
     switch m.cursor {
     case 0:
         msg = fmt.Sprintf("Quick")
-        p := tea.NewProgram(initialModel())
-        if _, err := p.Run(); err != nil {
-            fmt.Printf("Alas, there's been an error: %v", err)
-            os.Exit(1)
-    }   
+        getSong("qAmulKjcHoo")
     case 1:
         msg = fmt.Sprintf("Playlists")
     case 2:
